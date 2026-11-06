@@ -2,6 +2,10 @@
 
 #include <Arduino.h>
 
+// Reported to the lighting editor (HELLO) and published with the web
+// firmware updater. Bump on every release.
+constexpr char FIRMWARE_VERSION[] = "1.1.0";
+
 // ---------------------------------------------------------------------------
 // Pin map — XIAO ESP32S3, per SWIII "Schematic1 v2" (Main Board v2)
 //
@@ -35,8 +39,11 @@ constexpr uint32_t SWITCH_DEBOUNCE_MS = 50;
 // NeoPixels
 // ---------------------------------------------------------------------------
 constexpr uint16_t NEOPIXEL_COUNT = 8;
-// Global scale on top of the animation's own levels. 255 = unscaled, which
-// matches the previous version (its colours already top out at ~125).
+// LEDs [0, NEOPIXEL_BOTTOM_COUNT) play the pattern's bottom track, the rest
+// its top track.
+constexpr uint16_t NEOPIXEL_BOTTOM_COUNT = 4;
+// Default global brightness for the built-in pattern (1..255). The lighting
+// editor can change it per pattern.
 constexpr uint8_t  NEOPIXEL_BRIGHTNESS = 255;
 
 // Time for the motor/LED rail to settle after the peripheral MOSFET turns on.

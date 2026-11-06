@@ -3,6 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #include "config.h"
+#include "pattern.h"
 
 namespace leds {
 
@@ -10,23 +11,9 @@ namespace {
 
 Adafruit_NeoPixel strip(NEOPIXEL_COUNT, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
-// Lighting from the previous (RP2040 / MicroPython) version:
-//   LEDs 0-3 (bottom): green, breathing in brightness and saturation
-//   LEDs 4-7 (top):    solid dim red
-constexpr uint8_t  kBottomCount = 4;
-constexpr uint16_t kBottomHue = 21845;  // green
-constexpr uint16_t kTopHue = 0;         // red
-constexpr uint8_t  kTopSat = 255;
-constexpr uint8_t  kTopVal = 50;
+constexpr uint32_t kFrameMs = 20;
 
-constexpr uint8_t kMinVal = 10;
-constexpr uint8_t kMaxVal = 125;
-constexpr uint8_t kMinSat = 128;
-constexpr uint8_t kMaxSat = 255;
-constexpr uint8_t kBreathStep = 1;
-constexpr uint32_t kFrameMs = 50;
-
-// Low-battery warning: 3 red blinks (on/off phases), then back to breathing.
+// Low-battery warning: 3 red blinks (on/off phases), then back to the pattern.
 constexpr uint8_t  kWarnPhases = 6;
 constexpr uint32_t kWarnPhaseMs = 250;
 
@@ -35,35 +22,27 @@ bool warning = false;
 uint32_t warnStartMs = 0;
 uint8_t warnPhase = 0xFF;
 uint32_t lastFrameMs = 0;
-int16_t val = kMaxVal;
-int16_t sat = kMaxSat;
-bool valUp = false;
-bool satUp = false;
+uint32_t patternStartMs = 0;
 
-// Bounce between lo and hi, flipping direction at each end.
-void breathe(int16_t &x, bool &up, int16_t lo, int16_t hi) {
-  if (up) {
-    x += kBreathStep;
-    if (x >= hi) up = false;
-  } else {
-    x -= kBreathStep;
-    if (x <= lo) up = true;
-  }
+// Pattern colours are picked on a screen, so apply gamma to make the LEDs
+// look like the picker, then the global brightness.
+uint32_t trackColor(pattern::Track track, uint32_t elapsedMs) {
+  uint8_t r, g, b;
+  pattern::colorAt(track, elapsedMs, r, g, b);
+  const uint16_t bri = pattern::current().brightness;
+  return strip.Color(Adafruit_NeoPixel::gamma8(r) * bri / 255,
+                     Adafruit_NeoPixel::gamma8(g) * bri / 255,
+                     Adafruit_NeoPixel::gamma8(b) * bri / 255);
 }
 
 }  // namespace
 
 void begin() {
   strip.begin();
-  strip.setBrightness(NEOPIXEL_BRIGHTNESS);
   strip.clear();
   strip.show();
   begun = true;
-
-  val = kMaxVal;
-  sat = kMaxSat;
-  valUp = satUp = false;
-  lastFrameMs = millis();
+  restartPattern();
 }
 
 void shutdown() {
@@ -75,6 +54,11 @@ void shutdown() {
     begun = false;
   }
   pinMode(PIN_NEOPIXEL, INPUT);
+}
+
+void restartPattern() {
+  patternStartMs = millis();
+  lastFrameMs = patternStartMs - kFrameMs;  // draw on the next update()
 }
 
 void update() {
@@ -94,19 +78,17 @@ void update() {
       }
       return;
     }
-    warning = false;  // done: fall through and resume breathing
+    warning = false;  // done: fall through and resume the pattern
   }
 
   if (now - lastFrameMs < kFrameMs) return;
   lastFrameMs = now;
 
-  breathe(val, valUp, kMinVal, kMaxVal);
-  breathe(sat, satUp, kMinSat, kMaxSat);
-
-  const uint32_t bottom = strip.ColorHSV(kBottomHue, sat, val);
-  const uint32_t top = strip.ColorHSV(kTopHue, kTopSat, kTopVal);
+  const uint32_t elapsed = now - patternStartMs;
+  const uint32_t bottom = trackColor(pattern::Bottom, elapsed);
+  const uint32_t top = trackColor(pattern::Top, elapsed);
   for (uint16_t i = 0; i < NEOPIXEL_COUNT; i++) {
-    strip.setPixelColor(i, i < kBottomCount ? bottom : top);
+    strip.setPixelColor(i, i < NEOPIXEL_BOTTOM_COUNT ? bottom : top);
   }
   strip.show();
 }

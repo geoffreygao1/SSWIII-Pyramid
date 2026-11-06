@@ -12,8 +12,10 @@
 
 #include "battery.h"
 #include "config.h"
+#include "console.h"
 #include "leds.h"
 #include "motor.h"
+#include "pattern.h"
 #include "power.h"
 
 // True when a USB host is attached (the battery is then being charged).
@@ -47,41 +49,10 @@ static void checkBattery() {
   }
 }
 
-// Debug commands over USB serial, for tuning without reflashing:
-//   "18"    restart the motor from standstill at 18 %
-//   "f1000" set the motor PWM frequency to 1000 Hz
-static void handleSerialCommands() {
-  static uint32_t value = 0;
-  static uint8_t digits = 0;
-  static bool freq = false;
-  while (Serial.available()) {
-    const char c = Serial.read();
-    if (c >= '0' && c <= '9') {
-      if (digits < 6) value = value * 10 + (c - '0');
-      digits++;
-    } else if (c == 'f' || c == 'F') {
-      freq = true;
-    } else if (c == '\n' || c == '\r') {
-      if (digits > 0 && freq) {
-        const uint32_t actual = motor::setFrequency(constrain(value, 10u, 40000u));
-        Serial.printf("Motor PWM -> %lu Hz\n", static_cast<unsigned long>(actual));
-      } else if (digits > 0) {
-        const int percent = constrain(value, 0u, 100u);
-        motor::stop();
-        motor::setTarget(percent);
-        Serial.printf("Motor -> %d%%\n", percent);
-      }
-      value = 0;
-      digits = 0;
-      freq = false;
-    }
-    // Anything else (e.g. stray bytes when the port opens) is ignored.
-  }
-}
-
 void setup() {
   power::begin();
 
+  console::configure();
   Serial.begin(115200);
   if (usbConnected()) {
     const uint32_t t0 = millis();
@@ -96,6 +67,7 @@ void setup() {
   }
 
   battery::begin();
+  pattern::begin();
 
   power::peripheralsOn();
   leds::begin();
@@ -111,7 +83,7 @@ void loop() {
   battery::update();
   checkBattery();
 
-  handleSerialCommands();
+  console::update();
   leds::update();
   motor::update();
 }

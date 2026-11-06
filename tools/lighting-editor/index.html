@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyramid Lighting</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #111317;
+    --panel: #1a1d23;
+    --panel-2: #22262e;
+    --line: #2e333d;
+    --text: #e8eaed;
+    --muted: #9aa1ad;
+    --accent: #7cc4ff;
+    --ok: #5fd38d;
+    --warn: #f2c14e;
+    --err: #ff6b6b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    justify-content: space-between; margin-bottom: 18px;
+  }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  h2 { font-size: 15px; margin: 0; font-weight: 600; }
+  .conn { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .status { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; flex: none; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.busy { background: var(--warn); }
+  button {
+    font: inherit; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: #4a5160; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: #1f4b70; border-color: #2c6a9c; }
+  button.primary:hover:not(:disabled) { border-color: var(--accent); }
+  button.icon { padding: 4px 8px; min-width: 30px; }
+  .grid { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .panel + .panel { margin-top: 16px; }
+  .preview { position: sticky; top: 12px; }
+  @media (max-width: 860px) { .preview { position: static; } }
+  svg { width: 100%; height: auto; display: block; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  label.field { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  input[type=number] {
+    width: 74px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px;
+  }
+  select {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px;
+  }
+  input[type=color] {
+    width: 42px; height: 32px; padding: 0; border: 1px solid var(--line);
+    border-radius: 6px; background: none; cursor: pointer;
+  }
+  input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+  .timeline { margin-top: 10px; }
+  .tl-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  .tl-bar { position: relative; display: flex; height: 18px; border-radius: 5px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+  .tl-bar > div { height: 100%; }
+  .tl-head { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; box-shadow: 0 0 4px #000; }
+  .track-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .keys { display: flex; flex-direction: column; gap: 8px; }
+  .key {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  .key .idx { width: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .key .tools { margin-left: auto; display: flex; gap: 4px; }
+  .empty { color: var(--muted); padding: 8px 2px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .banner {
+    display: none; margin-bottom: 16px; padding: 10px 12px; border-radius: 8px;
+    background: #2b2614; border: 1px solid #5b4d1c; color: #f5e3a8;
+  }
+  .banner.show { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .log {
+    margin: 10px 0 0; max-height: 160px; overflow: auto; background: #0b0c0f; border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px; font: 12px/1.45 ui-monospace, Consolas, monospace; color: #b9c0cc; white-space: pre-wrap;
+  }
+  details summary { cursor: pointer; color: var(--muted); }
+  .switch { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.unsaved { color: var(--warn); border-color: #5b4d1c; }
+  .tag.saved { color: var(--ok); border-color: #1f5135; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Pyramid Lighting</h1>
+    <div class="conn">
+      <span class="status"><span id="dot" class="dot"></span><span id="statusText">Not connected</span></span>
+      <span id="saveTag" class="tag" hidden></span>
+      <button id="connectBtn" class="primary">Connect</button>
+    </div>
+  </header>
+
+  <div id="unsupported" class="banner">
+    <span>This browser can't talk to USB serial devices. Open this page in <b>Chrome</b> or <b>Edge</b> on a computer.
+    You can still design and preview patterns here and export them.</span>
+  </div>
+
+  <div id="diffBanner" class="banner">
+    <span>The pyramid has a different pattern from the one in the editor.</span>
+    <button id="usePyramidBtn">Use the pyramid's</button>
+    <button id="sendMineBtn">Send mine to the pyramid</button>
+  </div>
+
+  <div class="grid">
+    <div class="preview">
+      <div class="panel">
+        <div class="row between"><h2>Preview</h2><button id="restartBtn" title="Restart both tracks from the beginning">Restart</button></div>
+        <svg viewBox="0 0 300 270" aria-label="Pyramid preview">
+          <defs>
+            <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="9"/></filter>
+            <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#2a2f38"/><stop offset="1" stop-color="#1b1f26"/>
+            </linearGradient>
+          </defs>
+          <polygon points="150,14 284,250 16,250" fill="url(#face)" stroke="#3a404b" stroke-width="2"/>
+          <g id="topLeds"></g>
+          <g id="bottomLeds"></g>
+          <text x="150" y="266" fill="#6d7480" font-size="11" text-anchor="middle">Top: LEDs 5–8 · Bottom: LEDs 1–4</text>
+        </svg>
+        <div class="timeline">
+          <div class="tl-label"><span>Top</span><span id="topLen"></span></div>
+          <div class="tl-bar" id="topBar"></div>
+          <div class="tl-label"><span>Bottom</span><span id="bottomLen"></span></div>
+          <div class="tl-bar" id="bottomBar"></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label class="field" for="brightness" style="min-width:76px">Brightness</label>
+          <input type="range" id="brightness" min="1" max="255">
+          <span id="brightnessVal" class="muted small" style="width:34px;text-align:right"></span>
+        </div>
+        <p class="hint">The preview approximates the LEDs: colours are gamma-corrected on the pyramid so they look like the picker.</p>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin-bottom:10px">Pyramid</h2>
+        <div class="actions">
+          <label class="switch" title="Send every change to the pyramid as you edit (not saved until you press Save)">
+            <input type="checkbox" id="liveChk" checked> Live update
+          </label>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button id="saveBtn" class="primary" disabled>Save to pyramid</button>
+          <button id="loadBtn" disabled title="Load the pattern currently playing on the pyramid">Load from pyramid</button>
+          <button id="revertBtn" disabled title="Discard unsaved changes on the pyramid">Revert to saved</button>
+        </div>
+        <p class="hint">Live changes play straight away but are lost when the pyramid sleeps unless you press <b>Save</b>.</p>
+        <details>
+          <summary class="small">Log</summary>
+          <div id="log" class="log"></div>
+        </details>
+      </div>
+
+      <div class="panel" id="fwPanel" hidden>
+        <div class="row between"><h2>Firmware</h2><span id="fwTag" class="tag" hidden></span></div>
+        <p class="small muted" style="margin:8px 0 10px">
+          Latest: <b id="fwLatest">–</b> · On pyramid: <b id="fwDevice">connect to check</b>
+        </p>
+        <button id="fwDisconnectBtn" hidden>Disconnect to update</button>
+        <esp-web-install-button id="fwInstall" manifest="manifest.json">
+          <button slot="activate" class="primary">Update firmware</button>
+          <span slot="unsupported" class="small muted">Firmware updates need Chrome or Edge on a computer.</span>
+          <span slot="not-allowed" class="small muted">Firmware updates need this page to be opened over https.</span>
+        </esp-web-install-button>
+        <p class="hint">Switch the pyramid on, click <b>Update firmware</b> and pick it from the list. Your saved pattern is kept.
+          If the pyramid stays dark afterwards, switch it off and on again.</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel" id="topPanel"></div>
+      <div class="panel" id="bottomPanel"></div>
+      <div class="panel">
+        <div class="actions">
+          <button id="defaultBtn" title="Replace the editor with the built-in pattern">Built-in pattern</button>
+          <button id="exportBtn">Export JSON</button>
+          <button id="importBtn">Import JSON</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint">Each set loops on its own. A keyframe fades in from the previous keyframe's colour over <b>Fade</b>, then stays for <b>Hold</b>. One keyframe = solid colour; no keyframes = off.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---- Model ---------------------------------------------------------------
+  // Mirrors the firmware JSON: times in ms, colours "#rrggbb", ease linear|smooth.
+  const MAX_KEYS = 16;
+  const MAX_SECONDS = 600;
+  const TRACKS = [
+    { id: 'top', name: 'Top set', desc: 'LEDs 5-8' },
+    { id: 'bottom', name: 'Bottom set', desc: 'LEDs 1-4' },
+  ];
+  const DEFAULT_PATTERN = {
+    brightness: 255,
+    bottom: [
+      { c: '#384938', fade: 5750, hold: 0, ease: 'smooth' },
+      { c: '#00c200', fade: 5750, hold: 0, ease: 'smooth' },
+    ],
+    top: [{ c: '#880000', fade: 0, hold: 0, ease: 'linear' }],
+  };
+  const DRAFT_KEY = 'pyramid-lighting-draft';
+
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  let pattern = loadDraft() || clone(DEFAULT_PATTERN);
+  let startTime = performance.now();
+
+  function normalize(p) {
+    const out = { brightness: clampInt(p.brightness ?? 255, 1, 255) };
+    for (const t of TRACKS) {
+      const arr = Array.isArray(p[t.id]) ? p[t.id].slice(0, MAX_KEYS) : [];
+      out[t.id] = arr.map((k) => ({
+        c: /^#[0-9a-f]{6}$/i.test(k.c) ? k.c.toLowerCase() : '#000000',
+        fade: clampInt(k.fade ?? 0, 0, MAX_SECONDS * 1000),
+        hold: clampInt(k.hold ?? 0, 0, MAX_SECONDS * 1000),
+        ease: k.ease === 'smooth' ? 'smooth' : 'linear',
+      }));
+    }
+    return out;
+  }
+  function clampInt(v, lo, hi) { v = Math.round(Number(v) || 0); return Math.min(hi, Math.max(lo, v)); }
+  function samePattern(a, b) { return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b)); }
+
+  function loadDraft() {
+    try { const s = localStorage.getItem(DRAFT_KEY); return s ? normalize(JSON.parse(s)) : null; }
+    catch { return null; }
+  }
+  function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(pattern)); } catch {} }
+
+  // ---- Playback (same maths as firmware pattern::colorAt) -------------------
+  const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const rgbToCss = ([r, g, b]) => `rgb(${r | 0},${g | 0},${b | 0})`;
+  const trackLength = (keys) => keys.reduce((s, k) => s + k.fade + k.hold, 0);
+
+  function colorAt(keys, ms) {
+    const n = keys.length;
+    if (n === 0) return [0, 0, 0];
+    const total = trackLength(keys);
+    const last = hexToRgb(keys[n - 1].c);
+    if (total === 0) return last;
+    let t = ms % total;
+    for (let i = 0; i < n; i++) {
+      const k = keys[i];
+      if (t < k.fade) {
+        let s = t / k.fade;
+        if (k.ease === 'smooth') s = s * s * (3 - 2 * s);
+        const a = hexToRgb(keys[i === 0 ? n - 1 : i - 1].c), b = hexToRgb(k.c);
+        return a.map((v, j) => v + (b[j] - v) * s);
+      }
+      t -= k.fade;
+      if (t < k.hold) return hexToRgb(k.c);
+      t -= k.hold;
+    }
+    return last;
+  }
+
+  // ---- Preview -------------------------------------------------------------
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const ledEls = { top: [], bottom: [] };
+  function buildLeds() {
+    const rows = { top: { y: 96, xs: [118, 139, 161, 182] }, bottom: { y: 214, xs: [62, 120, 180, 238] } };
+    for (const id of ['top', 'bottom']) {
+      const g = document.getElementById(id + 'Leds');
+      for (const x of rows[id].xs) {
+        const halo = document.createElementNS(svgNS, 'circle');
+        halo.setAttribute('cx', x); halo.setAttribute('cy', rows[id].y); halo.setAttribute('r', 17);
+        halo.setAttribute('filter', 'url(#glow)');
+        const core = document.createElementNS(svgNS, 'circle');
+        core.setAttribute('cx', x); core.setAttribute('cy', rows[id].y); core.setAttribute('r', 6.5);
+        core.setAttribute('stroke', '#00000066');
+        g.append(halo, core);
+        ledEls[id].push({ halo, core });
+      }
+    }
+  }
+
+  function renderFrame(now) {
+    const ms = now - startTime;
+    // Firmware scales gamma-corrected light by brightness; on screen that is
+    // roughly a (b/255)^(1/2.6) scale of the sRGB value.
+    const k = Math.pow(pattern.brightness / 255, 1 / 2.6);
+    for (const t of TRACKS) {
+      const rgb = colorAt(pattern[t.id], ms).map((v) => v * k);
+      const css = rgbToCss(rgb);
+      const lum = Math.max(...rgb) / 255;
+      for (const { halo, core } of ledEls[t.id]) {
+        core.setAttribute('fill', css);
+        halo.setAttribute('fill', css);
+        halo.setAttribute('opacity', (0.15 + 0.85 * lum).toFixed(2));
+      }
+      const total = trackLength(pattern[t.id]);
+      const head = document.querySelector(`#${t.id}Bar .tl-head`);
+      if (head) head.style.left = total > 0 ? `calc(${((ms % total) / total) * 100}% - 1px)` : '0';
+    }
+    requestAnimationFrame(renderFrame);
+  }
+
+  function renderTimelines() {
+    for (const t of TRACKS) {
+      const keys = pattern[t.id];
+      const bar = document.getElementById(t.id + 'Bar');
+      bar.textContent = '';
+      const total = trackLength(keys);
+      document.getElementById(t.id + 'Len').textContent =
+        keys.length === 0 ? 'off' : total === 0 ? 'solid' : `${fmtSec(total)} loop`;
+      if (keys.length === 0) continue;
+      if (total === 0) {
+        const seg = document.createElement('div');
+        seg.style.flex = '1'; seg.style.background = keys[keys.length - 1].c;
+        bar.append(seg);
+      } else {
+        keys.forEach((k, i) => {
+          const prev = keys[i === 0 ? keys.length - 1 : i - 1].c;
+          if (k.fade > 0) {
+            const seg = document.createElement('div');
+            seg.style.flex = String(k.fade);
+            seg.style.background = `linear-gradient(90deg, ${prev}, ${k.c})`;
+            bar.append(seg);
+          }
+          if (k.hold > 0) {
+            const seg = document.createElement('div');
+            seg.style.flex = String(k.hold); seg.style.background = k.c;
+            bar.append(seg);
+          }
+        });
+      }
+      const head = document.createElement('div');
+      head.className = 'tl-head';
+      bar.append(head);
+    }
+  }
+
+  const fmtSec = (ms) => `${+(ms / 1000).toFixed(2)} s`;
+
+  // ---- Editor --------------------------------------------------------------
+  function el(tag, attrs = {}, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if (k === 'class') e.className = v;
+      else e.setAttribute(k, v);
+    }
+    e.append(...kids);
+    return e;
+  }
+
+  function renderEditor() {
+    for (const t of TRACKS) {
+      const keys = pattern[t.id];
+      const panel = document.getElementById(t.id + 'Panel');
+      panel.textContent = '';
+      const addBtn = el('button', { onclick: () => {
+        const lastKey = keys[keys.length - 1];
+        // A solid track has no duration; give its colour some time on screen
+        // so it doesn't vanish once there's something to fade to.
+        if (trackLength(keys) === 0) for (const k of keys) k.hold = 1000;
+        keys.push(lastKey ? { ...lastKey, fade: lastKey.fade || 1000 } : { c: '#ffffff', fade: 1000, hold: 0, ease: 'smooth' });
+        changed(true);
+      } }, '+ Add keyframe');
+      if (keys.length >= MAX_KEYS) addBtn.disabled = true;
+      panel.append(el('div', { class: 'track-head' },
+        el('div', {}, el('h2', {}, t.name), el('div', { class: 'muted small' }, `${t.desc} · ${keys.length}/${MAX_KEYS} keyframes`)),
+        addBtn));
+
+      const list = el('div', { class: 'keys' });
+      if (keys.length === 0) list.append(el('div', { class: 'empty' }, 'No keyframes — these LEDs are off.'));
+      keys.forEach((k, i) => list.append(keyRow(keys, k, i)));
+      panel.append(list);
+    }
+  }
+
+  function secondsInput(value, onset, title) {
+    const inp = el('input', { type: 'number', min: '0', max: String(MAX_SECONDS), step: '0.1', title });
+    inp.value = +(value / 1000).toFixed(3);
+    inp.addEventListener('input', () => { onset(clampInt(parseFloat(inp.value) * 1000, 0, MAX_SECONDS * 1000)); changed(false); });
+    inp.addEventListener('change', () => { inp.value = +(parseFloat(inp.value) || 0).toFixed(3); renderTimelines(); });
+    return inp;
+  }
+
+  function keyRow(keys, k, i) {
+    const color = el('input', { type: 'color', value: k.c, title: 'Colour' });
+    color.addEventListener('input', () => { k.c = color.value; changed(false); });
+
+    const ease = el('select', { title: 'Fade curve' },
+      el('option', { value: 'smooth' }, 'Smooth'), el('option', { value: 'linear' }, 'Linear'));
+    ease.value = k.ease;
+    ease.addEventListener('change', () => { k.ease = ease.value; changed(false); });
+
+    const move = (d) => { const j = i + d; [keys[i], keys[j]] = [keys[j], keys[i]]; changed(true); };
+    const up = el('button', { class: 'icon', title: 'Move up', onclick: () => move(-1) }, '↑');
+    const down = el('button', { class: 'icon', title: 'Move down', onclick: () => move(1) }, '↓');
+    up.disabled = i === 0; down.disabled = i === keys.length - 1;
+    const dup = el('button', { class: 'icon', title: 'Duplicate', onclick: () => { keys.splice(i + 1, 0, { ...k }); changed(true); } }, '⧉');
+    dup.disabled = keys.length >= MAX_KEYS;
+    const del = el('button', { class: 'icon', title: 'Delete', onclick: () => { keys.splice(i, 1); changed(true); } }, '✕');
+
+    return el('div', { class: 'key' },
+      el('span', { class: 'idx' }, String(i + 1)),
+      color,
+      el('label', { class: 'field' }, 'Fade', secondsInput(k.fade, (v) => (k.fade = v), 'Fade in from the previous keyframe, seconds'), 's'),
+      el('label', { class: 'field' }, 'Hold', secondsInput(k.hold, (v) => (k.hold = v), 'Stay on this colour, seconds'), 's'),
+      ease,
+      el('span', { class: 'tools' }, up, down, dup, del));
+  }
+
+  const brightness = document.getElementById('brightness');
+  const brightnessVal = document.getElementById('brightnessVal');
+  brightness.addEventListener('input', () => {
+    pattern.brightness = Number(brightness.value);
+    brightnessVal.textContent = Math.round((pattern.brightness / 255) * 100) + '%';
+    changed(false);
+  });
+
+  // structural: rebuild the keyframe list (add/remove/reorder)
+  function changed(structural) {
+    if (structural) renderEditor();
+    renderTimelines();
+    saveDraft();
+    restartPreview();
+    queueLiveSend();
+  }
+
+  function renderAll() {
+    brightness.value = pattern.brightness;
+    brightnessVal.textContent = Math.round((pattern.brightness / 255) * 100) + '%';
+    renderEditor();
+    renderTimelines();
+  }
+
+  function restartPreview() { startTime = performance.now(); }
+
+  function setPattern(p) {
+    pattern = normalize(p);
+    saveDraft();
+    renderAll();
+    restartPreview();
+  }
+
+  // ---- Serial --------------------------------------------------------------
+  const ui = {
+    dot: document.getElementById('dot'),
+    status: document.getElementById('statusText'),
+    saveTag: document.getElementById('saveTag'),
+    connect: document.getElementById('connectBtn'),
+    save: document.getElementById('saveBtn'),
+    load: document.getElementById('loadBtn'),
+    revert: document.getElementById('revertBtn'),
+    live: document.getElementById('liveChk'),
+    log: document.getElementById('log'),
+    diff: document.getElementById('diffBanner'),
+  };
+
+  let port = null, reader = null, writer = null, readLoopDone = null;
+  let pending = [];          // FIFO of { resolve, reject, timer } awaiting '@' replies
+  let deviceDirty = false;   // pyramid is playing something not yet saved
+  let liveTimer = null, liveInFlight = false, liveAgain = false;
+
+  function log(line, cls) {
+    const atBottom = ui.log.scrollTop + ui.log.clientHeight >= ui.log.scrollHeight - 4;
+    const d = el('div', {}, line);
+    if (cls) d.style.color = cls;
+    ui.log.append(d);
+    while (ui.log.childNodes.length > 300) ui.log.firstChild.remove();
+    if (atBottom) ui.log.scrollTop = ui.log.scrollHeight;
+  }
+
+  function setStatus(state, text) {
+    ui.dot.className = 'dot' + (state === 'on' ? ' on' : state === 'busy' ? ' busy' : '');
+    ui.status.textContent = text;
+    const connected = state === 'on';
+    ui.connect.textContent = port ? 'Disconnect' : 'Connect';
+    for (const b of [ui.save, ui.load, ui.revert]) b.disabled = !connected;
+    renderSaveTag();
+  }
+
+  function renderSaveTag() {
+    if (!port || !writer) { ui.saveTag.hidden = true; return; }
+    ui.saveTag.hidden = false;
+    ui.saveTag.className = 'tag ' + (deviceDirty ? 'unsaved' : 'saved');
+    ui.saveTag.textContent = deviceDirty ? 'Unsaved on pyramid' : 'Saved on pyramid';
+  }
+
+  function send(line, timeoutMs = 3000) {
+    return new Promise((resolve, reject) => {
+      if (!writer) return reject(new Error('Not connected'));
+      const entry = { resolve, reject };
+      entry.timer = setTimeout(() => {
+        pending = pending.filter((p) => p !== entry);
+        reject(new Error('No reply from pyramid'));
+      }, timeoutMs);
+      pending.push(entry);
+      const shown = line.length > 90 ? line.slice(0, 90) + '…' : line;
+      log('> ' + shown, '#7cc4ff');
+      writer.write(new TextEncoder().encode(line + '\n')).catch(reject);
+    });
+  }
+
+  function handleLine(line) {
+    if (!line.startsWith('@')) { if (line.trim()) log(line); return; }
+    log(line.length > 120 ? line.slice(0, 120) + '…' : line, line.startsWith('@ERR') ? '#ff6b6b' : '#5fd38d');
+    const p = pending.shift();
+    if (!p) return;
+    clearTimeout(p.timer);
+    if (line.startsWith('@ERR')) p.reject(new Error(line.slice(5)));
+    else p.resolve(line);
+  }
+
+  async function readLoop() {
+    let buf = '';
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          handleLine(buf.slice(0, i).replace(/\r$/, ''));
+          buf = buf.slice(i + 1);
+        }
+      }
+    } catch (e) {
+      log('Read stopped: ' + e.message, '#f2c14e');
+    }
+  }
+
+  const parsePatternReply = (line) => normalize(JSON.parse(line.replace(/^@PATTERN\s*/, '')));
+
+  async function connect() {
+    try {
+      port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+    } catch { port = null; return; }  // user cancelled the picker
+    setStatus('busy', 'Connecting…');
+    try {
+      await port.open({ baudRate: 115200 });
+      reader = port.readable.getReader();
+      writer = port.writable.getWriter();
+      readLoopDone = readLoop();
+      const hello = await send('HELLO');
+      if (!/^@HELLO pyramid/.test(hello)) throw new Error('Not a pyramid: ' + hello);
+      deviceFw = (hello.match(/\bfw=(\S+)/) || [])[1] || 'unknown';
+      renderFirmware();
+      const devicePattern = parsePatternReply(await send('GET'));
+      deviceDirty = false;
+      setStatus('on', 'Connected');
+      if (!samePattern(devicePattern, pattern)) {
+        pendingDevicePattern = devicePattern;
+        ui.diff.classList.add('show');
+      }
+    } catch (e) {
+      log('Connect failed: ' + e.message, '#ff6b6b');
+      await disconnect();
+      setStatus('off', 'Could not connect — is the pyramid switched on?');
+    }
+  }
+
+  async function disconnect() {
+    for (const p of pending) { clearTimeout(p.timer); p.reject(new Error('Disconnected')); }
+    pending = [];
+    ui.diff.classList.remove('show');
+    try { if (reader) { await reader.cancel(); reader.releaseLock(); } } catch {}
+    try { if (readLoopDone) await readLoopDone; } catch {}
+    try { if (writer) { writer.releaseLock(); } } catch {}
+    try { if (port) await port.close(); } catch {}
+    port = reader = writer = readLoopDone = null;
+    setStatus('off', 'Not connected');
+    renderFirmware();
+  }
+
+  // ---- Firmware updates (ESP Web Tools; only on the hosted page) -----------
+  // The installer opens the serial port itself, so this page must let go of
+  // it first. Requesting the port needs a fresh click, hence two steps.
+  let latestFw = null, deviceFw = null;
+  const fw = {
+    panel: document.getElementById('fwPanel'),
+    tag: document.getElementById('fwTag'),
+    latest: document.getElementById('fwLatest'),
+    device: document.getElementById('fwDevice'),
+    install: document.getElementById('fwInstall'),
+    disconnect: document.getElementById('fwDisconnectBtn'),
+  };
+
+  function renderFirmware() {
+    fw.latest.textContent = latestFw || '–';
+    fw.device.textContent = deviceFw || 'connect to check';
+    const known = latestFw && deviceFw && deviceFw !== 'unknown';
+    fw.tag.hidden = !known;
+    if (known) {
+      const current = deviceFw === latestFw;
+      fw.tag.className = 'tag ' + (current ? 'saved' : 'unsaved');
+      fw.tag.textContent = current ? 'Up to date' : 'Update available';
+    }
+    fw.disconnect.hidden = !port;
+    fw.install.hidden = !!port;
+  }
+  fw.disconnect.onclick = async () => {
+    await disconnect();
+    log('Disconnected. Now click Update firmware and choose the pyramid.', '#f2c14e');
+  };
+
+  fetch('manifest.json', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((m) => {
+      latestFw = m.version;
+      fw.panel.hidden = false;
+      renderFirmware();
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = 'https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module';
+      document.head.append(s);
+    })
+    .catch(() => {});  // opened as a local file: no updater
+
+  let pendingDevicePattern = null;
+  document.getElementById('usePyramidBtn').onclick = () => {
+    if (pendingDevicePattern) setPattern(pendingDevicePattern);
+    pendingDevicePattern = null;
+    ui.diff.classList.remove('show');
+  };
+  document.getElementById('sendMineBtn').onclick = async () => {
+    pendingDevicePattern = null;
+    ui.diff.classList.remove('show');
+    await pushLive();
+  };
+
+  async function pushLive() {
+    if (!writer) return;
+    liveInFlight = true;
+    try {
+      await send('SET ' + JSON.stringify(normalize(pattern)));
+      deviceDirty = true;
+    } catch (e) {
+      log('Update failed: ' + e.message, '#ff6b6b');
+    } finally {
+      liveInFlight = false;
+      renderSaveTag();
+      if (liveAgain) { liveAgain = false; queueLiveSend(); }
+    }
+  }
+
+  // Coalesce rapid edits (e.g. dragging a colour) into at most one SET in flight.
+  function queueLiveSend() {
+    if (!writer || !ui.live.checked) return;
+    if (liveInFlight) { liveAgain = true; return; }
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(pushLive, 120);
+  }
+
+  ui.connect.onclick = () => (port ? disconnect() : connect());
+  ui.save.onclick = async () => {
+    try {
+      await send('SET ' + JSON.stringify(normalize(pattern)));
+      await send('SAVE');
+      deviceDirty = false;
+      setStatus('on', 'Connected — saved');
+    } catch (e) { log('Save failed: ' + e.message, '#ff6b6b'); }
+    renderSaveTag();
+  };
+  ui.load.onclick = async () => {
+    try { setPattern(parsePatternReply(await send('GET'))); }
+    catch (e) { log('Load failed: ' + e.message, '#ff6b6b'); }
+  };
+  ui.revert.onclick = async () => {
+    try { setPattern(parsePatternReply(await send('REVERT'))); deviceDirty = false; }
+    catch (e) { log('Revert failed: ' + e.message, '#ff6b6b'); }
+    renderSaveTag();
+  };
+  ui.live.onchange = () => { if (ui.live.checked) queueLiveSend(); };
+
+  // ---- File / misc ---------------------------------------------------------
+  document.getElementById('restartBtn').onclick = async () => {
+    restartPreview();
+    if (writer) await pushLive();  // SET restarts the pyramid's tracks too
+  };
+  document.getElementById('defaultBtn').onclick = () => { setPattern(DEFAULT_PATTERN); queueLiveSend(); };
+  document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(normalize(pattern), null, 2)], { type: 'application/json' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: 'pyramid-pattern.json' });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const importFile = document.getElementById('importFile');
+  document.getElementById('importBtn').onclick = () => importFile.click();
+  importFile.onchange = async () => {
+    const f = importFile.files[0];
+    importFile.value = '';
+    if (!f) return;
+    try { setPattern(JSON.parse(await f.text())); queueLiveSend(); }
+    catch (e) { log('Import failed: ' + e.message, '#ff6b6b'); }
+  };
+
+  if ('serial' in navigator) {
+    navigator.serial.addEventListener('disconnect', (e) => {
+      if (e.target === port || e.port === port) {
+        log('Pyramid disconnected (switched off or unplugged)', '#f2c14e');
+        disconnect();
+      }
+    });
+  } else {
+    document.getElementById('unsupported').classList.add('show');
+    ui.connect.disabled = true;
+  }
+
+  buildLeds();
+  renderAll();
+  setStatus('off', 'Not connected');
+  requestAnimationFrame(renderFrame);
+})();
+</script>
+</body>
+</html>

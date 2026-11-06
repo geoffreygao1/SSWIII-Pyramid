@@ -1,0 +1,92 @@
+# Builds the firmware and publishes the lighting editor (tools/lighting-editor)
+# plus the firmware images for its web updater to GitHub Pages.
+name: Build and publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware
+        run: pio run -e xiao_esp32s3
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/.*FIRMWARE_VERSION\[\] = "\([^"]*\)".*/\1/p' include/config.h)
+          test -n "$VERSION"
+          BUILD=.pio/build/xiao_esp32s3
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -n1)
+
+          mkdir -p site/firmware
+          cp tools/lighting-editor/index.html site/
+          cp "$BUILD/bootloader.bin" "$BUILD/partitions.bin" "$BUILD/firmware.bin" site/firmware/
+          cp "$BOOT_APP0" site/firmware/boot_app0.bin
+
+          # ESP Web Tools manifest. Offsets match the default_8MB partition
+          # table; NVS (0x9000) is never written, so the saved pattern survives.
+          cat > site/manifest.json <<EOF
+          {
+            "name": "SSWIII Pyramid",
+            "version": "$VERSION",
+            "new_install_prompt_erase": false,
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "parts": [
+                  { "path": "firmware/bootloader.bin", "offset": 0 },
+                  { "path": "firmware/partitions.bin", "offset": 32768 },
+                  { "path": "firmware/boot_app0.bin", "offset": 57344 },
+                  { "path": "firmware/firmware.bin", "offset": 65536 }
+                ]
+              }
+            ]
+          }
+          EOF
+          echo "Published firmware $VERSION"
+          ls -l site site/firmware
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

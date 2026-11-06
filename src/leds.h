@@ -9,7 +9,11 @@ void begin();
 // PGND to be cut (see config.h).
 void shutdown();
 
+// Draw the current keyframe pattern (see pattern.h).
 void update();
+
+// Restart both tracks from t = 0, e.g. after the pattern changes.
+void restartPattern();
 
 // Blink the whole strip red 3 times (driven by update(), non-blocking), then
 // return to the normal animation.
