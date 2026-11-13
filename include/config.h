@@ -4,7 +4,7 @@
 
 // Reported to the lighting editor (HELLO) and published with the web
 // firmware updater. Bump on every release.
-constexpr char FIRMWARE_VERSION[] = "1.1.0";
+constexpr char FIRMWARE_VERSION[] = "1.1.1";
 
 // ---------------------------------------------------------------------------
 // Pin map — XIAO ESP32S3, per SWIII "Schematic1 v2" (Main Board v2)

@@ -11,7 +11,9 @@ namespace {
 
 constexpr char kNamespace[] = "pyramid";
 constexpr char kKey[] = "pattern";
-constexpr char kTrackNames[TrackCount][7] = {"bottom", "top"};
+// Plain pointers: ArduinoJson takes a char[N] key to be N-1 chars long, which
+// would turn "top" in a char[7] into "top\0\0\0".
+const char *const kTrackNames[TrackCount] = {"bottom", "top"};
 
 Pattern live;
 

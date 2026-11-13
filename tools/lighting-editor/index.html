@@ -563,6 +563,11 @@
       reader = port.readable.getReader();
       writer = port.writable.getWriter();
       readLoopDone = readLoop();
+      // End any partial line left in the pyramid's buffer (e.g. from a
+      // previous tool) so it doesn't get glued onto HELLO. Its @ERR reply
+      // arrives while nothing is pending, so handleLine drops it.
+      await writer.write(new TextEncoder().encode('\n'));
+      await new Promise((r) => setTimeout(r, 300));
       const hello = await send('HELLO');
       if (!/^@HELLO pyramid/.test(hello)) throw new Error('Not a pyramid: ' + hello);
       deviceFw = (hello.match(/\bfw=(\S+)/) || [])[1] || 'unknown';
