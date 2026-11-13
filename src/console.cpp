@@ -57,6 +57,10 @@ void run(char *s) {
   } else if ((s[0] == 'F' || s[0] == 'f') && isdigit(s[1])) {
     const uint32_t hz = motor::setFrequency(constrain(atol(s + 1), 10L, 40000L));
     Serial.printf("@OK pwm %lu\n", static_cast<unsigned long>(hz));
+  } else if ((s[0] == 'S' || s[0] == 's') && isdigit(s[1])) {
+    const int percent = constrain(atoi(s + 1), 0, 100);
+    motor::setTarget(percent);  // ramp from the current speed, no restart
+    Serial.printf("@OK speed %d\n", percent);
   } else if (isdigit(s[0]) || ((s[0] == 'M' || s[0] == 'm') && isdigit(s[1]))) {
     const int percent = constrain(atoi(isdigit(s[0]) ? s : s + 1), 0, 100);
     motor::stop();

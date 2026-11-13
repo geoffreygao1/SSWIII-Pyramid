@@ -4,7 +4,7 @@
 
 // Reported to the lighting editor (HELLO) and published with the web
 // firmware updater. Bump on every release.
-constexpr char FIRMWARE_VERSION[] = "1.1.1";
+constexpr char FIRMWARE_VERSION[] = "1.1.2";
 
 // ---------------------------------------------------------------------------
 // Pin map — XIAO ESP32S3, per SWIII "Schematic1 v2" (Main Board v2)
@@ -55,13 +55,13 @@ constexpr uint32_t PERIPH_SETTLE_MS = 20;
 constexpr uint32_t MOTOR_PWM_FREQ_HZ = 20000;  // above audible range
 constexpr uint8_t  MOTOR_PWM_BITS    = 10;     // duty 0..1023
 constexpr uint8_t  MOTOR_PWM_CHANNEL = 0;      // LEDC channel (Arduino-ESP32 2.x)
-constexpr uint8_t  MOTOR_RUN_PERCENT = 18;     // speed after wake-up (15 unreliable, 12 stalls)
+constexpr uint8_t  MOTOR_RUN_PERCENT = 30;     // speed after wake-up (18 won't start the motors)
 constexpr uint32_t MOTOR_RAMP_MS     = 800;    // time for a full-scale speed change
 // Low run speeds can't overcome static friction from standstill, so a start
 // from 0 briefly drives this hard, then ramps down to the run speed.
 // 0 (or anything <= the run speed) disables the kick.
 constexpr uint8_t  MOTOR_KICK_PERCENT = 0;
-constexpr uint32_t MOTOR_KICK_MS      = 150;
+constexpr uint32_t MOTOR_KICK_MS      = 300;
 
 // ---------------------------------------------------------------------------
 // Battery (1S LiPo)

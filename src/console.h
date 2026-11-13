@@ -10,7 +10,8 @@
 //   SAVE           -> @OK saved | @ERR <reason> store live pattern in flash
 //   REVERT         -> @PATTERN <json>           reload the saved pattern
 //   DEFAULT        -> @PATTERN <json>           load the built-in pattern (unsaved)
-//   M<n> or <n>    -> @OK motor <n>             restart motor at n %
+//   M<n> or <n>    -> @OK motor <n>             restart motor from standstill at n %
+//   S<n>           -> @OK speed <n>             change speed to n % without stopping
 //   F<n>           -> @OK pwm <hz>              set motor PWM frequency
 namespace console {
 
