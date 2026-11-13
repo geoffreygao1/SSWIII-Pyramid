@@ -97,6 +97,8 @@
   details summary { cursor: pointer; color: var(--muted); }
   .switch { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .steps { padding-left: 18px; margin: 10px 0; }
+  .steps li + li { margin-top: 4px; }
   .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
   .tag.unsaved { color: var(--warn); border-color: #5b4d1c; }
   .tag.saved { color: var(--ok); border-color: #1f5135; }
@@ -185,8 +187,24 @@
           <span slot="unsupported" class="small muted">Firmware updates need Chrome or Edge on a computer.</span>
           <span slot="not-allowed" class="small muted">Firmware updates need this page to be opened over https.</span>
         </esp-web-install-button>
-        <p class="hint">Switch the pyramid on, click <b>Update firmware</b> and pick it from the list. Your saved pattern is kept.
-          If the pyramid stays dark afterwards, switch it off and on again.</p>
+        <ol class="hint steps">
+          <li>Plug the pyramid into this computer with USB and switch it <b>on</b>.</li>
+          <li>Click <b>Update firmware</b>, choose the pyramid
+            (<i>USB JTAG/serial debug unit</i>), then <b>Install</b>.</li>
+          <li>Wait for <b>Installation complete</b> (about a minute). The saved pattern is kept.</li>
+        </ol>
+        <details class="small">
+          <summary>Trouble updating?</summary>
+          <ul class="hint steps">
+            <li><b>Pyramid not in the list:</b> it's asleep. Check the switch is on (try the other position).
+              If it still doesn't appear, open the pyramid, hold the <b>B</b> button on the small board,
+              tap <b>R</b>, release <b>B</b>, and try again.</li>
+            <li><b>Lights stay off after updating:</b> the board is still in update mode. Tap <b>R</b> once.
+              (The pyramid's own switch can't reset it.)</li>
+            <li><b>"Failed to connect" / port busy:</b> close other tabs or programs using the pyramid,
+              unplug and replug the USB cable, and try again.</li>
+          </ul>
+        </details>
       </div>
     </div>
 
